@@ -1,9 +1,9 @@
-const { CosmosClient } = require("@azure/cosmos");
 const express = require("express");
+const { CosmosClient } = require("@azure/cosmos");
 const bodyParser = require("body-parser");
 const multer = require("multer");
-const axios = require("axios");
 const path = require("path");
+const cors = require("cors");
 
 // Environment variables
 require("dotenv").config();
@@ -11,8 +11,14 @@ require("dotenv").config();
 const app = express();
 const upload = multer({ dest: "uploads/" });
 
+app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+
+app.use((req, res, next) => {
+  console.log(`Incoming request: ${req.method} ${req.url}`);
+  next();
+});
 
 // Connect to Azure Cosmos DB
 const client = new CosmosClient(process.env.COSMOS_DB_CONNECTION_STRING);
@@ -39,12 +45,16 @@ connectToCosmosDB();
 const authRoutes = require("./routes/auth");
 const uploadRoutes = require("./routes/upload");
 const chatRoutes = require("./routes/chat");
-const userRoutes = require("./routes/user"); 
+const userRoutes = require("./routes/user");
+const widgetRoutes = require("./routes/widget");
 
 app.use("/auth", authRoutes);
 app.use("/upload", uploadRoutes);
 app.use("/chat", chatRoutes);
-app.use("/user", userRoutes); 
+app.use("/user", userRoutes);
+app.use("/generate-widget", widgetRoutes);
+
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

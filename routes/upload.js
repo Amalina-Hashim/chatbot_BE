@@ -17,7 +17,7 @@ router.post(
   async (req, res) => {
     const { fileType } = req.body;
     const userId = req.userId;
-    console.log("File upload - User ID from token:", userId); 
+    console.log("File upload - User ID from token:", userId);
 
     try {
       const file = await File.createFile(userId, fileType, req.file.path);
@@ -35,18 +35,18 @@ router.post(
   verifyToken,
   voiceSampleUpload.single("voiceSample"),
   async (req, res) => {
-    const userId = req.userId; 
-    console.log("Voice upload - User ID from token:", userId); 
+    const userId = req.userId;
+    console.log("Voice upload - User ID from token:", userId);
 
     try {
       const user = await User.findOneById(userId);
-      console.log("Voice upload - User found:", user); 
+      console.log("Voice upload - User found:", user);
       if (!user) {
         return res.status(404).send("User not found");
       }
 
       user.voiceSample = req.file.path;
-      await User.updateUser(user); 
+      await User.updateUser(user);
       res.send("Voice sample uploaded");
     } catch (error) {
       console.error("Error uploading voice sample:", error);

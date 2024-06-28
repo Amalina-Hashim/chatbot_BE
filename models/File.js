@@ -5,11 +5,17 @@ const database = client.database("chatbotproject");
 const container = database.container("files");
 
 class File {
+  static sanitizeId(id) {
+    return id.replace(/[/\\?#]/g, "-");
+  }
+
   static async createFile(userId, fileType, filePath) {
+    const sanitizedUserId = File.sanitizeId(userId);
+    const sanitizedFileType = File.sanitizeId(fileType);
     const file = {
-      id: `${userId}-${fileType}-${Date.now()}`, 
-      userId,
-      fileType,
+      id: `${sanitizedUserId}-${sanitizedFileType}-${Date.now()}`,
+      userId: sanitizedUserId,
+      fileType: sanitizedFileType,
       filePath,
     };
     const { resource } = await container.items.create(file);

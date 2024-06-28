@@ -5,6 +5,7 @@ const path = require("path");
 const pdfParse = require("pdf-parse");
 const mammoth = require("mammoth");
 const sdk = require("microsoft-cognitiveservices-speech-sdk");
+const archiver = require("archiver");
 const { verifyToken } = require("../utils/auth");
 const File = require("../models/File");
 const User = require("../models/User");
@@ -66,6 +67,7 @@ const readFileContent = async (filePath, fileType) => {
   console.log(`Reading file content. File type: ${fileType}`);
   switch (fileType) {
     case "application/pdf":
+    case "application-pdf":
     case "pdf":
       return await readPdfContent(filePath);
     case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
@@ -84,7 +86,9 @@ const synthesizeSpeech = async (text) => {
     process.env.AZURE_SPEECH_KEY,
     process.env.AZURE_SPEECH_REGION
   );
-  const audioConfig = sdk.AudioConfig.fromAudioFileOutput("output.wav");
+  const audioFileName = `${Date.now()}-response.wav`;
+  const audioFilePath = path.join(__dirname, "../uploads", audioFileName);
+  const audioConfig = sdk.AudioConfig.fromAudioFileOutput(audioFilePath);
   const synthesizer = new sdk.SpeechSynthesizer(speechConfig, audioConfig);
 
   return new Promise((resolve, reject) => {
@@ -93,7 +97,7 @@ const synthesizeSpeech = async (text) => {
       (result) => {
         if (result.reason === sdk.ResultReason.SynthesizingAudioCompleted) {
           console.log("Synthesis finished.");
-          resolve("output.wav");
+          resolve(audioFileName);
         } else {
           console.error("Speech synthesis canceled, " + result.errorDetails);
           reject(result.errorDetails);
@@ -110,17 +114,26 @@ const synthesizeSpeech = async (text) => {
 };
 
 router.post("/", verifyToken, async (req, res) => {
+  console.log("POST /chat endpoint hit");
   const { message } = req.body;
   const userId = req.userId;
+  console.log("User ID:", userId);
+  console.log("Message:", message);
 
   try {
     const userFiles = await File.findFilesByUserId(userId);
     const user = await User.findOneById(userId);
+    console.log("User found:", user);
 
     let context = `Here is the resume and personal information of ${user.username}:\n\n`;
 
     for (const file of userFiles) {
       const filePath = path.join(__dirname, "../", file.filePath);
+      if (!fs.existsSync(filePath)) {
+        console.log(`File not found: ${file.filePath}, removing from DB`);
+        await File.deleteFileById(file.id);
+        continue;
+      }
       console.log(`Processing file: ${file.filePath}`);
       const fileContent = await readFileContent(filePath, file.fileType);
       context += extractKeyInfo(fileContent, MAX_CONTEXT_LENGTH) + "\n\n";
@@ -132,18 +145,74 @@ router.post("/", verifyToken, async (req, res) => {
     }
 
     const responseData = await openAIRequest(context, message);
+    console.log("OpenAI response:", responseData);
 
-    const synthesizedAudioPath = await synthesizeSpeech(
+    const audioFileName = await synthesizeSpeech(
       responseData.choices[0].message.content
     );
+    console.log("Audio file generated:", audioFileName);
 
     res.json({
       ...responseData,
-      audioPath: synthesizedAudioPath,
+      audioPath: `/uploads/${audioFileName}`,
     });
   } catch (error) {
     console.error("Error processing chat:", error);
     res.status(500).send("Error processing chat");
+  }
+});
+
+router.post("/generate-widget", verifyToken, async (req, res) => {
+  const userId = req.userId;
+
+  try {
+    const output = fs.createWriteStream(
+      path.join(__dirname, "../dist/chatbot-widget.zip")
+    );
+    const archive = archiver("zip", {
+      zlib: { level: 9 },
+    });
+
+    output.on("close", () => {
+      console.log(archive.pointer() + " total bytes");
+      console.log(
+        "Archiver has been finalized and the output file descriptor has closed."
+      );
+      res.download(path.join(__dirname, "../dist/chatbot-widget.zip"));
+    });
+
+    archive.on("error", (err) => {
+      throw err;
+    });
+
+    archive.pipe(output);
+
+    archive.file(
+      path.join(__dirname, "../src/components/ChatBotWidget/ChatBotWidget.js"),
+      { name: "chatbot-widget.js" }
+    );
+
+    const widgetCode = `
+    <script src="path/to/chatbot-widget.js"></script>
+    <div id="chatbot-container"></div>
+    <script>
+      ChatBotWidget.renderChatBotWidget('chatbot-container');
+    </script>
+    `;
+
+    fs.writeFileSync(
+      path.join(__dirname, "../dist/widget-code.html"),
+      widgetCode
+    );
+
+    archive.file(path.join(__dirname, "../dist/widget-code.html"), {
+      name: "widget-code.html",
+    });
+
+    archive.finalize();
+  } catch (error) {
+    console.error("Error generating widget:", error);
+    res.status(500).send("Error generating widget");
   }
 });
 
