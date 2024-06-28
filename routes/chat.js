@@ -130,7 +130,7 @@ router.post("/", verifyToken, async (req, res) => {
   try {
     const userFiles = await File.findFilesByUserId(userId);
     const user = await User.findOneById(userId);
-    const username = user.username; // Get the username
+    const username = user.username; 
     console.log("User found:", user);
 
     let context = `Here is the resume and personal information of ${username}:\n\n`;
