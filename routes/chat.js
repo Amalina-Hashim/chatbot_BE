@@ -129,12 +129,11 @@ router.post("/", verifyToken, async (req, res) => {
 
     for (const file of userFiles) {
       const filePath = path.join(__dirname, "../", file.filePath);
+      console.log(`Processing file: ${file.filePath}`);
       if (!fs.existsSync(filePath)) {
-        console.log(`File not found: ${file.filePath}, removing from DB`);
-        await File.deleteFileById(file.id);
+        console.log(`File not found: ${file.filePath}, skipping`);
         continue;
       }
-      console.log(`Processing file: ${file.filePath}`);
       const fileContent = await readFileContent(filePath, file.fileType);
       context += extractKeyInfo(fileContent, MAX_CONTEXT_LENGTH) + "\n\n";
     }
