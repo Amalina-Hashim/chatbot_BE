@@ -15,7 +15,7 @@ const router = express.Router();
 
 const MAX_CONTEXT_LENGTH = 2000;
 
-const openAIRequest = async (context, message) => {
+const openAIRequest = async (context, message, username) => {
   try {
     const response = await axios.post(
       "https://api.openai.com/v1/chat/completions",
@@ -24,7 +24,7 @@ const openAIRequest = async (context, message) => {
         messages: [
           {
             role: "system",
-            content: `You are Amalina Hashim. The following is your resume and personal information:\n\n${context}`,
+            content: `You are ${username}. The following is your resume and personal information:\n\n${context}`,
           },
           { role: "user", content: message },
         ],
@@ -41,7 +41,7 @@ const openAIRequest = async (context, message) => {
         : 1000;
       console.error(`Rate limited. Retrying after ${retryAfter}ms`);
       await new Promise((resolve) => setTimeout(resolve, retryAfter));
-      return openAIRequest(context, message);
+      return openAIRequest(context, message, username);
     } else {
       throw error;
     }
@@ -72,6 +72,9 @@ const readFileContent = async (filePath, fileType) => {
       return await readPdfContent(filePath);
     case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
     case "application/msword":
+    case "application/word":
+    case "application/vnd.ms-word.document.macroEnabled.12":
+    case "application/vnd.ms-word.template.macroEnabled.12":
       return await readDocxContent(filePath);
     case "text/plain":
       return readTxtContent(filePath);
@@ -79,6 +82,10 @@ const readFileContent = async (filePath, fileType) => {
       console.error(`Unsupported file type: ${fileType}`);
       throw new Error("Unsupported file type");
   }
+};
+
+const sanitizeFilePath = (filePath) => {
+  return filePath.replace(/[^a-zA-Z0-9_\-.]/g, "");
 };
 
 const synthesizeSpeech = async (text) => {
@@ -123,15 +130,17 @@ router.post("/", verifyToken, async (req, res) => {
   try {
     const userFiles = await File.findFilesByUserId(userId);
     const user = await User.findOneById(userId);
+    const username = user.username; // Get the username
     console.log("User found:", user);
 
-    let context = `Here is the resume and personal information of ${user.username}:\n\n`;
+    let context = `Here is the resume and personal information of ${username}:\n\n`;
 
     for (const file of userFiles) {
-      const filePath = path.join(__dirname, "../", file.filePath);
-      console.log(`Processing file: ${file.filePath}`);
+      const sanitizedFilePath = sanitizeFilePath(file.filePath);
+      const filePath = path.join(__dirname, "../", sanitizedFilePath);
+      console.log(`Processing file: ${filePath}`);
       if (!fs.existsSync(filePath)) {
-        console.log(`File not found: ${file.filePath}, skipping`);
+        console.log(`File not found: ${filePath}, skipping`);
         continue;
       }
       const fileContent = await readFileContent(filePath, file.fileType);
@@ -143,7 +152,7 @@ router.post("/", verifyToken, async (req, res) => {
         context.slice(0, MAX_CONTEXT_LENGTH) + "... [content truncated]";
     }
 
-    const responseData = await openAIRequest(context, message);
+    const responseData = await openAIRequest(context, message, username);
     console.log("OpenAI response:", responseData);
 
     const audioFileName = await synthesizeSpeech(
