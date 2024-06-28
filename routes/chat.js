@@ -75,6 +75,7 @@ const readFileContent = async (filePath, fileType) => {
     case "application/word":
     case "application/vnd.ms-word.document.macroEnabled.12":
     case "application/vnd.ms-word.template.macroEnabled.12":
+    case "application-vnd.openxmlformats-officedocument.wordprocessingml.document": // Additional case
       return await readDocxContent(filePath);
     case "text/plain":
       return readTxtContent(filePath);
@@ -82,10 +83,6 @@ const readFileContent = async (filePath, fileType) => {
       console.error(`Unsupported file type: ${fileType}`);
       throw new Error("Unsupported file type");
   }
-};
-
-const sanitizeFilePath = (filePath) => {
-  return filePath.replace(/[^a-zA-Z0-9_\-.]/g, "");
 };
 
 const synthesizeSpeech = async (text) => {
@@ -130,17 +127,17 @@ router.post("/", verifyToken, async (req, res) => {
   try {
     const userFiles = await File.findFilesByUserId(userId);
     const user = await User.findOneById(userId);
-    const username = user.username; 
+    const username = user.username; // Get the username
     console.log("User found:", user);
 
     let context = `Here is the resume and personal information of ${username}:\n\n`;
 
     for (const file of userFiles) {
-      const sanitizedFilePath = sanitizeFilePath(file.filePath);
-      const filePath = path.join(__dirname, "../", sanitizedFilePath);
+      const filePath = path.join(__dirname, "../", file.filePath);
       console.log(`Processing file: ${filePath}`);
       if (!fs.existsSync(filePath)) {
-        console.log(`File not found: ${filePath}, skipping`);
+        console.log(`File not found: ${filePath}, removing from DB`);
+        await File.deleteFileById(file.id);
         continue;
       }
       const fileContent = await readFileContent(filePath, file.fileType);
