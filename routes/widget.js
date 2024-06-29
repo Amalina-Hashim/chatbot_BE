@@ -9,6 +9,7 @@ const router = express.Router();
 router.post("/", verifyToken, async (req, res) => {
   const userId = req.userId;
   const distDir = path.join(__dirname, "../dist");
+  const resourcesDir = path.join(__dirname, "../resources");
 
   // Ensure the dist directory exists
   if (!fs.existsSync(distDir)) {
@@ -16,19 +17,26 @@ router.post("/", verifyToken, async (req, res) => {
   }
 
   try {
-    const output = fs.createWriteStream(
-      path.join(distDir, "chatbot-widget.zip")
-    );
+    const outputFilePath = path.join(distDir, "chatbot-widget.zip");
+    const output = fs.createWriteStream(outputFilePath);
     const archive = archiver("zip", {
       zlib: { level: 9 },
     });
 
     output.on("close", () => {
-      console.log(archive.pointer() + " total bytes");
-      console.log(
-        "Archiver has been finalized and the output file descriptor has closed."
+      console.log(`Archive created with ${archive.pointer()} total bytes`);
+      console.log(`Archive file path: ${outputFilePath}`);
+      res.setHeader("Content-Type", "application/zip");
+      res.setHeader(
+        "Content-Disposition",
+        "attachment; filename=chatbot-widget.zip"
       );
-      res.download(path.join(distDir, "chatbot-widget.zip"));
+      res.download(outputFilePath, "chatbot-widget.zip", (err) => {
+        if (err) {
+          console.error("Error sending file:", err);
+          res.status(500).send("Error downloading the file");
+        }
+      });
     });
 
     archive.on("error", (err) => {
@@ -37,24 +45,99 @@ router.post("/", verifyToken, async (req, res) => {
 
     archive.pipe(output);
 
-    archive.file(
-      path.join(__dirname, "../src/components/ChatBotWidget/ChatBotWidget.js"),
-      { name: "chatbot-widget.js" }
-    );
+    // Add files to the archive
+    const filesToInclude = ["ChatBotWidget.js", "ChatBot.js"];
+    filesToInclude.forEach((file) => {
+      const filePath = path.join(resourcesDir, file);
+      if (fs.existsSync(filePath)) {
+        console.log(`Adding ${file} to archive`);
+        archive.file(filePath, { name: file });
+      } else {
+        console.error(`${file} does not exist at ${filePath}`);
+      }
+    });
 
+    // Add additional documentation and example integration
     const widgetCode = `
-    <script src="path/to/chatbot-widget.js"></script>
-    <div id="chatbot-container"></div>
+    <script src="./ChatBotWidget.js"></script>
+    <div id="chatbot-button" style="position:fixed; bottom:20px; right:20px; cursor:pointer; background-color:#5a00ff; color:white; padding:10px; border-radius:50%; z-index:1000;">
+      Chat
+    </div>
+    <div id="chatbot-container" style="position:fixed; bottom:70px; right:20px; z-index:1000;"></div>
     <script>
-      ChatBotWidget.renderChatBotWidget('chatbot-container');
+      document.getElementById("chatbot-button").onclick = function() {
+        if (!document.getElementById("chatbot-widget")) {
+          renderChatBotWidget('chatbot-container');
+        }
+      }
     </script>
     `;
 
-    fs.writeFileSync(path.join(distDir, "widget-code.html"), widgetCode);
+    const readmeContent = `
+    # Chatbot Widget Integration
 
-    archive.file(path.join(distDir, "widget-code.html"), {
-      name: "widget-code.html",
-    });
+    ## How to Integrate
+
+    1. Copy the \`ChatBotWidget.js\` and \`ChatBot.js\` files to a suitable location in your React project (e.g., \`src/components\`).
+    2. Add the following HTML to your \`public/index.html\` or any HTML file that is rendered as part of your React application:
+
+    \`\`\`html
+    <div id="chatbot-button" style="position:fixed; bottom:20px; right:20px; cursor:pointer; background-color:#5a00ff; color:white; padding:10px; border-radius:50%; z-index:1000;">
+      Chat
+    </div>
+    <div id="chatbot-container" style="position:fixed; bottom:70px; right:20px; z-index:1000;"></div>
+    <script src="%PUBLIC_URL%/components/ChatBotWidget.js"></script>
+    <script>
+      document.getElementById("chatbot-button").onclick = function() {
+        if (!document.getElementById("chatbot-widget")) {
+          renderChatBotWidget('chatbot-container');
+        }
+      }
+    </script>
+    \`\`\`
+
+    3. Make sure to replace \`%PUBLIC_URL%\` with the correct path to where you placed the \`ChatBotWidget.js\` file.
+
+    ## Example
+
+    Here is an example integration:
+
+    \`\`\`html
+    <!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>React App</title>
+      </head>
+      <body>
+        <div id="root"></div>
+        <!-- Chatbot widget integration -->
+        <div id="chatbot-button" style="position:fixed; bottom:20px; right:20px; cursor:pointer; background-color:#5a00ff; color:white; padding:10px; border-radius:50%; z-index:1000;">
+          Chat
+        </div>
+        <div id="chatbot-container" style="position:fixed; bottom:70px; right:20px; z-index:1000;"></div>
+        <script src="%PUBLIC_URL%/components/ChatBotWidget.js"></script>
+        <script>
+          document.getElementById("chatbot-button").onclick = function() {
+            if (!document.getElementById("chatbot-widget")) {
+              renderChatBotWidget('chatbot-container');
+            }
+          }
+        </script>
+      </body>
+    </html>
+    \`\`\`
+    `;
+
+    const widgetCodePath = path.join(resourcesDir, "widget-code.html");
+    const readmePath = path.join(resourcesDir, "README.md");
+
+    fs.writeFileSync(widgetCodePath, widgetCode);
+    fs.writeFileSync(readmePath, readmeContent);
+
+    archive.file(widgetCodePath, { name: "widget-code.html" });
+    archive.file(readmePath, { name: "README.md" });
 
     archive.finalize();
   } catch (error) {

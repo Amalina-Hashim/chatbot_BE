@@ -5,7 +5,6 @@ const path = require("path");
 const pdfParse = require("pdf-parse");
 const mammoth = require("mammoth");
 const sdk = require("microsoft-cognitiveservices-speech-sdk");
-const archiver = require("archiver");
 const { verifyToken } = require("../utils/auth");
 const File = require("../models/File");
 const User = require("../models/User");
@@ -136,8 +135,7 @@ router.post("/", verifyToken, async (req, res) => {
       const filePath = path.join(__dirname, "../", file.filePath);
       console.log(`Processing file: ${filePath}`);
       if (!fs.existsSync(filePath)) {
-        console.log(`File not found: ${filePath}, removing from DB`);
-        await File.deleteFileById(file.id);
+        console.log(`File not found: ${filePath}, skipping`);
         continue;
       }
       const fileContent = await readFileContent(filePath, file.fileType);
@@ -164,60 +162,6 @@ router.post("/", verifyToken, async (req, res) => {
   } catch (error) {
     console.error("Error processing chat:", error);
     res.status(500).send("Error processing chat");
-  }
-});
-
-router.post("/generate-widget", verifyToken, async (req, res) => {
-  const userId = req.userId;
-
-  try {
-    const output = fs.createWriteStream(
-      path.join(__dirname, "../dist/chatbot-widget.zip")
-    );
-    const archive = archiver("zip", {
-      zlib: { level: 9 },
-    });
-
-    output.on("close", () => {
-      console.log(archive.pointer() + " total bytes");
-      console.log(
-        "Archiver has been finalized and the output file descriptor has closed."
-      );
-      res.download(path.join(__dirname, "../dist/chatbot-widget.zip"));
-    });
-
-    archive.on("error", (err) => {
-      throw err;
-    });
-
-    archive.pipe(output);
-
-    archive.file(
-      path.join(__dirname, "../src/components/ChatBotWidget/ChatBotWidget.js"),
-      { name: "chatbot-widget.js" }
-    );
-
-    const widgetCode = `
-    <script src="path/to/chatbot-widget.js"></script>
-    <div id="chatbot-container"></div>
-    <script>
-      ChatBotWidget.renderChatBotWidget('chatbot-container');
-    </script>
-    `;
-
-    fs.writeFileSync(
-      path.join(__dirname, "../dist/widget-code.html"),
-      widgetCode
-    );
-
-    archive.file(path.join(__dirname, "../dist/widget-code.html"), {
-      name: "widget-code.html",
-    });
-
-    archive.finalize();
-  } catch (error) {
-    console.error("Error generating widget:", error);
-    res.status(500).send("Error generating widget");
   }
 });
 
