@@ -11,7 +11,12 @@ require("dotenv").config();
 const app = express();
 const upload = multer({ dest: "uploads/" });
 
-app.use(cors());
+const corsOptions = {
+  origin: "http://localhost:3000",
+  optionsSuccessStatus: 200,
+};
+
+app.use(cors(corsOptions));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
