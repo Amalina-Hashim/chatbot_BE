@@ -12,7 +12,10 @@ const app = express();
 const upload = multer({ dest: "uploads/" });
 
 const corsOptions = {
-  origin: "http://localhost:3000",
+  origin: [
+    "http://localhost:3000",
+    "https://happy-flower-0c7eb4a00.5.azurestaticapps.net",
+  ],
   optionsSuccessStatus: 200,
 };
 
