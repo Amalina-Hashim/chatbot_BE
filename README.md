@@ -1,6 +1,6 @@
 # Chatbot Widget Project
 
-This project consists of an admin portal and a chatbot widget. The admin portal allows users to upload their information and generate a chatbot widget, which can be integrated into any existing ReactJS project. The chatbot widget can be used to interact with users and respond to their queries based on the uploaded information.
+This project consists of an admin portal and a chatbot widget. The admin portal allows users to upload their information and generate a chatbot widget, which can be integrated into any existing ReactJS project. The chatbot widget can be used to interact with users and respond to their queries based on the uploaded information. Access frontend code here()
 
 ## Features
 
@@ -51,8 +51,7 @@ This project consists of an admin portal and a chatbot widget. The admin portal 
 1. Clone the repository:
 
     ```bash
-    git clone https://github.com/your-repo/chatbot-widget-project.git
-    cd chatbot-widget-project
+    git clone https://github.com/amalina-hashim/chatbot_BE.git
     ```
 
 2. Install dependencies:
