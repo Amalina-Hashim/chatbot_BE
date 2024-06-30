@@ -42,6 +42,7 @@ const openAIRequest = async (context, message, username) => {
       await new Promise((resolve) => setTimeout(resolve, retryAfter));
       return openAIRequest(context, message, username);
     } else {
+      console.error("Error in openAIRequest:", error.message);
       throw error;
     }
   }
@@ -126,7 +127,7 @@ router.post("/", verifyToken, async (req, res) => {
   try {
     const userFiles = await File.findFilesByUserId(userId);
     const user = await User.findOneById(userId);
-    const username = user.username; // Get the username
+    const username = user.username; 
     console.log("User found:", user);
 
     let context = `Here is the resume and personal information of ${username}:\n\n`;

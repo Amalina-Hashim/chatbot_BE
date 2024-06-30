@@ -8,6 +8,7 @@ const router = express.Router();
 
 router.post("/", verifyToken, async (req, res) => {
   const userId = req.userId;
+  const userToken = req.headers.authorization.split(" ")[1]; 
   const distDir = path.join(__dirname, "../dist");
   const resourcesDir = path.join(__dirname, "../resources");
 
@@ -67,7 +68,8 @@ router.post("/", verifyToken, async (req, res) => {
     <script>
       document.getElementById("chatbot-button").onclick = function() {
         if (!document.getElementById("chatbot-widget")) {
-          renderChatBotWidget('chatbot-container');
+          const userToken = "${userToken}"; // auto generate user token
+          renderChatBotWidget('chatbot-container', userToken);
         }
       }
     </script>
@@ -88,9 +90,10 @@ router.post("/", verifyToken, async (req, res) => {
     <div id="chatbot-container" style="position:fixed; bottom:70px; right:20px; z-index:1000;"></div>
     <script src="%PUBLIC_URL%/components/ChatBotWidget.js"></script>
     <script>
+      const userToken = "${userToken}"; // user token auto generated
       document.getElementById("chatbot-button").onclick = function() {
         if (!document.getElementById("chatbot-widget")) {
-          renderChatBotWidget('chatbot-container');
+          renderChatBotWidget('chatbot-container', userToken);
         }
       }
     </script>
@@ -119,9 +122,10 @@ router.post("/", verifyToken, async (req, res) => {
         <div id="chatbot-container" style="position:fixed; bottom:70px; right:20px; z-index:1000;"></div>
         <script src="%PUBLIC_URL%/components/ChatBotWidget.js"></script>
         <script>
+          const userToken = "${userToken}"; // user token auto generated
           document.getElementById("chatbot-button").onclick = function() {
             if (!document.getElementById("chatbot-widget")) {
-              renderChatBotWidget('chatbot-container');
+              renderChatBotWidget('chatbot-container', userToken);
             }
           }
         </script>
@@ -133,6 +137,7 @@ router.post("/", verifyToken, async (req, res) => {
     const widgetCodePath = path.join(resourcesDir, "widget-code.html");
     const readmePath = path.join(resourcesDir, "README.md");
 
+    
     fs.writeFileSync(widgetCodePath, widgetCode);
     fs.writeFileSync(readmePath, readmeContent);
 

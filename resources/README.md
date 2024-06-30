@@ -13,9 +13,10 @@
     <div id="chatbot-container" style="position:fixed; bottom:70px; right:20px; z-index:1000;"></div>
     <script src="%PUBLIC_URL%/components/ChatBotWidget.js"></script>
     <script>
+      const userToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IlVmbyIsImlhdCI6MTcxOTc2MzAzNywiZXhwIjoxNzE5ODA2MjM3fQ.QoHuC-4W1MSEF900Hz5XudC6RyYoSQM4qmW0ERBpoAo"; // auto generated user token
       document.getElementById("chatbot-button").onclick = function() {
         if (!document.getElementById("chatbot-widget")) {
-          renderChatBotWidget('chatbot-container');
+          renderChatBotWidget('chatbot-container', userToken);
         }
       }
     </script>
@@ -44,9 +45,10 @@
         <div id="chatbot-container" style="position:fixed; bottom:70px; right:20px; z-index:1000;"></div>
         <script src="%PUBLIC_URL%/components/ChatBotWidget.js"></script>
         <script>
+          const userToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IlVmbyIsImlhdCI6MTcxOTc2MzAzNywiZXhwIjoxNzE5ODA2MjM3fQ.QoHuC-4W1MSEF900Hz5XudC6RyYoSQM4qmW0ERBpoAo"; // Replace with the actual user token
           document.getElementById("chatbot-button").onclick = function() {
             if (!document.getElementById("chatbot-widget")) {
-              renderChatBotWidget('chatbot-container');
+              renderChatBotWidget('chatbot-container', userToken);
             }
           }
         </script>

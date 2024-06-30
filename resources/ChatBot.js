@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { sendMessage } from "../api";
 
-const ChatBot = () => {
+const ChatBot = ({ userToken }) => {
   const [message, setMessage] = useState("");
   const [chatLog, setChatLog] = useState([]);
   const [audioPath, setAudioPath] = useState("");
@@ -10,14 +10,19 @@ const ChatBot = () => {
   const handleSendMessage = async () => {
     if (!message.trim()) return;
     setLoading(true);
-    const response = await sendMessage(message);
-    setChatLog([
-      ...chatLog,
-      { sender: "user", text: message },
-      { sender: "bot", text: response.choices[0].message.content },
-    ]);
-    setMessage("");
-    setAudioPath(response.audioPath);
+    try {
+      console.log("User token in handleSendMessage:", userToken); 
+      const response = await sendMessage(message, userToken);
+      setChatLog([
+        ...chatLog,
+        { sender: "user", text: message },
+        { sender: "bot", text: response.choices[0].message.content },
+      ]);
+      setMessage("");
+      setAudioPath(response.audioPath);
+    } catch (error) {
+      console.error("Error sending message:", error);
+    }
     setLoading(false);
   };
 
@@ -60,7 +65,7 @@ const ChatBot = () => {
               ...
             </span>
           </div>
-        )}
+        ))}
       </div>
       <div className="flex">
         <input

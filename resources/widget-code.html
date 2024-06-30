@@ -7,7 +7,8 @@
     <script>
       document.getElementById("chatbot-button").onclick = function() {
         if (!document.getElementById("chatbot-widget")) {
-          renderChatBotWidget('chatbot-container');
+          const userToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IlVmbyIsImlhdCI6MTcxOTc2MzAzNywiZXhwIjoxNzE5ODA2MjM3fQ.QoHuC-4W1MSEF900Hz5XudC6RyYoSQM4qmW0ERBpoAo"; // Replace placeholder with actual user token
+          renderChatBotWidget('chatbot-container', userToken);
         }
       }
     </script>
