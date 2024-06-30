@@ -23,7 +23,7 @@ const openAIRequest = async (context, message, username) => {
         messages: [
           {
             role: "system",
-            content: `You are ${username}. The following is your resume and personal information:\n\n${context}`,
+            content: `You are ${username}. The following is your information:\n\n${context}`,
           },
           { role: "user", content: message },
         ],
