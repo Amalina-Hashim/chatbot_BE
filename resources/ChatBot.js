@@ -5,8 +5,11 @@ const ChatBot = () => {
   const [message, setMessage] = useState("");
   const [chatLog, setChatLog] = useState([]);
   const [audioPath, setAudioPath] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleSendMessage = async () => {
+    if (!message.trim()) return;
+    setLoading(true);
     const response = await sendMessage(message);
     setChatLog([
       ...chatLog,
@@ -15,11 +18,21 @@ const ChatBot = () => {
     ]);
     setMessage("");
     setAudioPath(response.audioPath);
+    setLoading(false);
   };
 
   const handlePlayAudio = () => {
-    const audio = new Audio(`http://localhost:5000${audioPath}`);
+    const audio = new Audio(
+      `https://chatbot-widget88.azurewebsites.net/${audioPath}`
+    );
     audio.play();
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSendMessage();
+    }
   };
 
   return (
@@ -41,17 +54,26 @@ const ChatBot = () => {
             </span>
           </div>
         ))}
+        {loading && (
+          <div className="text-left mb-2">
+            <span className="inline-block p-2 rounded bg-gray-100 animate-pulse">
+              ...
+            </span>
+          </div>
+        )}
       </div>
       <div className="flex">
         <input
           type="text"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
+          onKeyPress={handleKeyPress}
           className="flex-1 p-2 border rounded-l"
         />
         <button
           onClick={handleSendMessage}
           className="px-4 py-2 bg-blue-500 text-white rounded-r"
+          disabled={loading}
         >
           Send
         </button>
