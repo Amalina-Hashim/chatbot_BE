@@ -130,7 +130,7 @@ router.post("/", verifyToken, async (req, res) => {
     const username = user.username; 
     console.log("User found:", user);
 
-    let context = `Here is the resume and personal information of ${username}:\n\n`;
+    let context = `Here is the personal information of ${username}:\n\n`;
 
     for (const file of userFiles) {
       const filePath = path.join(__dirname, "../", file.filePath);
