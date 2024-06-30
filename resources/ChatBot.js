@@ -11,7 +11,6 @@ const ChatBot = ({ userToken }) => {
     if (!message.trim()) return;
     setLoading(true);
     try {
-      console.log("User token in handleSendMessage:", userToken); 
       const response = await sendMessage(message, userToken);
       setChatLog([
         ...chatLog,
