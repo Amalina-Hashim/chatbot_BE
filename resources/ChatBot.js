@@ -64,7 +64,7 @@ const ChatBot = ({ userToken }) => {
               ...
             </span>
           </div>
-        ))}
+        )}
       </div>
       <div className="flex">
         <input
