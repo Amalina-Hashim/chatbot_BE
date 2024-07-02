@@ -45,6 +45,8 @@ This project consists of an admin portal and a chatbot widget. The admin portal 
 
 5. Make sure to replace `%PUBLIC_URL%` with the correct path to where you placed the `ChatBotWidget.js` file.
 
+6. If you are uploading info and generating widget from https://happy-flower-0c7eb4a00.5.azurestaticapps.net/ to use in your website project for dev purposes, contact me for more info on CORS enablement.
+
 
 ## Getting Started
 

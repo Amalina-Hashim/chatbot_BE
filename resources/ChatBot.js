@@ -4,8 +4,7 @@ import axios from "axios";
 const API_URL = "https://chatbot-widget88.azurewebsites.net";
 
 const sendMessage = async (message, userToken) => {
-  const token = userToken || localStorage.getItem("token");
-  if (!token) {
+  if (!userToken) {
     throw new Error("No token provided");
   }
   const response = await axios.post(
@@ -13,7 +12,7 @@ const sendMessage = async (message, userToken) => {
     { message },
     {
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${userToken}`,
       },
     }
   );
@@ -85,17 +84,19 @@ const ChatBot = ({ userToken }) => {
           </div>
         )}
       </div>
-      <div className="flex">
+      <div className="flex items-center">
         <input
           type="text"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyPress={handleKeyPress}
           className="flex-1 p-2 border rounded-l"
+          style={{ minWidth: 0 }}
         />
         <button
           onClick={handleSendMessage}
-          className="px-4 py-2 bg-blue-500 text-white rounded-r"
+          className="px-4 py-2 text-white rounded-r"
+          style={{ backgroundColor: "#0000FF", flexShrink: 0 }}
           disabled={loading}
         >
           Send
@@ -104,7 +105,8 @@ const ChatBot = ({ userToken }) => {
       {audioPath && (
         <button
           onClick={handlePlayAudio}
-          className="mt-4 px-4 py-2 bg-green-500 text-white rounded"
+          className="mt-4 px-4 py-2 text-white rounded"
+          style={{ backgroundColor: "#9999ef", flexShrink: 0 }}
         >
           Play Audio Response
         </button>

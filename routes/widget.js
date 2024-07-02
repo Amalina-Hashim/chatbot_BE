@@ -8,7 +8,7 @@ const router = express.Router();
 
 router.post("/", verifyToken, async (req, res) => {
   const userId = req.userId;
-  const userToken = req.headers.authorization.split(" ")[1]; 
+  const userToken = req.headers.authorization.split(" ")[1];
   const distDir = path.join(__dirname, "../dist");
   const resourcesDir = path.join(__dirname, "../resources");
 
@@ -66,12 +66,12 @@ router.post("/", verifyToken, async (req, res) => {
     </div>
     <div id="chatbot-container" style="position:fixed; bottom:70px; right:20px; z-index:1000;"></div>
     <script>
-      document.getElementById("chatbot-button").onclick = function() {
+      const userToken = "${userToken}"; // auto generate user token
+      document.getElementById("chatbot-button").onclick = function () {
         if (!document.getElementById("chatbot-widget")) {
-          const userToken = "${userToken}"; // auto generate user token
-          renderChatBotWidget('chatbot-container', userToken);
+          window.renderChatBotWidget("chatbot-container", userToken);
         }
-      }
+      };
     </script>
     `;
 
@@ -81,8 +81,10 @@ router.post("/", verifyToken, async (req, res) => {
     ## How to Integrate
 
     1. Copy the \`ChatBotWidget.js\` and \`ChatBot.js\` files to a suitable location in your React project (e.g., \`src/components\`).
-    2. npm install axios
+    2. Install dependencies: \`npm install axios tailwindcss \`
     3. Add the following HTML to your \`public/index.html\` or any HTML file that is rendered as part of your React application:
+    4. Remember to also add into index.js: import { renderChatBotWidget } from "./components/ChatBotWidget";
+      window.renderChatBotWidget = renderChatBotWidget;
 
     \`\`\`html
     <div id="chatbot-button" style="position:fixed; bottom:20px; right:20px; cursor:pointer; background-color:#5a00ff; color:white; padding:10px; border-radius:50%; z-index:1000;">
@@ -92,15 +94,15 @@ router.post("/", verifyToken, async (req, res) => {
     <script src="%PUBLIC_URL%/components/ChatBotWidget.js"></script>
     <script>
       const userToken = "${userToken}"; // user token auto generated
-      document.getElementById("chatbot-button").onclick = function() {
+      document.getElementById("chatbot-button").onclick = function () {
         if (!document.getElementById("chatbot-widget")) {
-          renderChatBotWidget('chatbot-container', userToken);
+          window.renderChatBotWidget("chatbot-container", userToken);
         }
-      }
+      };
     </script>
     \`\`\`
 
-    3. Make sure to replace \`%PUBLIC_URL%\` with the correct path to where you placed the \`ChatBotWidget.js\` file.
+    5. Make sure to replace \`%PUBLIC_URL%\` with the correct path to where you placed the \`ChatBotWidget.js\` file.
 
     ## Example
 
@@ -124,21 +126,22 @@ router.post("/", verifyToken, async (req, res) => {
         <script src="%PUBLIC_URL%/components/ChatBotWidget.js"></script>
         <script>
           const userToken = "${userToken}"; // user token auto generated
-          document.getElementById("chatbot-button").onclick = function() {
+          document.getElementById("chatbot-button").onclick = function () {
             if (!document.getElementById("chatbot-widget")) {
-              renderChatBotWidget('chatbot-container', userToken);
+              window.renderChatBotWidget("chatbot-container", userToken);
             }
-          }
+          };
         </script>
       </body>
     </html>
     \`\`\`
+
+    6. Note that CORS enablement required on Azure if you are implementing widget on your website
     `;
 
     const widgetCodePath = path.join(resourcesDir, "widget-code.html");
     const readmePath = path.join(resourcesDir, "README.md");
 
-    
     fs.writeFileSync(widgetCodePath, widgetCode);
     fs.writeFileSync(readmePath, readmeContent);
 
