@@ -81,7 +81,8 @@ router.post("/", verifyToken, async (req, res) => {
     ## How to Integrate
 
     1. Copy the \`ChatBotWidget.js\` and \`ChatBot.js\` files to a suitable location in your React project (e.g., \`src/components\`).
-    2. Add the following HTML to your \`public/index.html\` or any HTML file that is rendered as part of your React application:
+    2. npm install axios
+    3. Add the following HTML to your \`public/index.html\` or any HTML file that is rendered as part of your React application:
 
     \`\`\`html
     <div id="chatbot-button" style="position:fixed; bottom:20px; right:20px; cursor:pointer; background-color:#5a00ff; color:white; padding:10px; border-radius:50%; z-index:1000;">

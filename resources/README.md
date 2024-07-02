@@ -4,7 +4,8 @@
     ## How to Integrate
 
     1. Copy the `ChatBotWidget.js` and `ChatBot.js` files to a suitable location in your React project (e.g., `src/components`).
-    2. Add the following HTML to your `public/index.html` or any HTML file that is rendered as part of your React application:
+    2. npm install axios
+    3. Add the following HTML to your `public/index.html` or any HTML file that is rendered as part of your React application:
 
     ```html
     <div id="chatbot-button" style="position:fixed; bottom:20px; right:20px; cursor:pointer; background-color:#5a00ff; color:white; padding:10px; border-radius:50%; z-index:1000;">
@@ -45,7 +46,7 @@
         <div id="chatbot-container" style="position:fixed; bottom:70px; right:20px; z-index:1000;"></div>
         <script src="%PUBLIC_URL%/components/ChatBotWidget.js"></script>
         <script>
-          const userToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IlVmbyIsImlhdCI6MTcxOTc2MzAzNywiZXhwIjoxNzE5ODA2MjM3fQ.QoHuC-4W1MSEF900Hz5XudC6RyYoSQM4qmW0ERBpoAo"; // Replace with the actual user token
+          const userToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IlVmbyIsImlhdCI6MTcxOTc2MzAzNywiZXhwIjoxNzE5ODA2MjM3fQ.QoHuC-4W1MSEF900Hz5XudC6RyYoSQM4qmW0ERBpoAo"; // auto generated user token
           document.getElementById("chatbot-button").onclick = function() {
             if (!document.getElementById("chatbot-widget")) {
               renderChatBotWidget('chatbot-container', userToken);

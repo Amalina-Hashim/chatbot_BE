@@ -1,5 +1,24 @@
 import React, { useState } from "react";
-import { sendMessage } from "../api";
+import axios from "axios";
+
+const API_URL = "https://chatbot-widget88.azurewebsites.net";
+
+const sendMessage = async (message, userToken) => {
+  const token = userToken || localStorage.getItem("token");
+  if (!token) {
+    throw new Error("No token provided");
+  }
+  const response = await axios.post(
+    `${API_URL}/chat`,
+    { message },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+  return response.data;
+};
 
 const ChatBot = ({ userToken }) => {
   const [message, setMessage] = useState("");
