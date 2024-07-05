@@ -14,7 +14,7 @@ const createAudioFileFromText = async (text) => {
     try {
       const audio = await client.generate({
         voice: "KGZYHfBYGAwgJIZze4iF", // Replace with your custom voice ID if needed
-        model_id: "eleven_turbo_v2",
+        model_id: "eleven_multilingual_v2", 
         text,
       });
       const fileName = `${uuid()}.mp3`;
