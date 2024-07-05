@@ -19,6 +19,7 @@
     "compromise": "^14.13.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
+    "elevenlabs": "^0.8.2",
     "express": "^4.19.2",
     "fs": "^0.0.1-security",
     "install": "^0.13.0",
@@ -31,6 +32,7 @@
     "npm": "^10.8.1",
     "pdf-parse": "^1.1.1",
     "text-summarization": "^1.0.4",
-    "unzipper": "^0.12.1"
+    "unzipper": "^0.12.1",
+    "uuid": "^10.0.0"
   }
 }

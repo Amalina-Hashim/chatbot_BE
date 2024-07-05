@@ -1,14 +1,14 @@
 const express = require("express");
-const axios = require("axios");
+const axios = require("axios"); // Add this line
 const fs = require("fs");
 const path = require("path");
 const pdfParse = require("pdf-parse");
 const mammoth = require("mammoth");
-const sdk = require("microsoft-cognitiveservices-speech-sdk");
 const { verifyToken } = require("../utils/auth");
 const File = require("../models/File");
 const User = require("../models/User");
 const extractKeyInfo = require("../utils/extractKeyInfo");
+const { createAudioFileFromText } = require("./textToSpeech");
 
 const router = express.Router();
 
@@ -86,35 +86,15 @@ const readFileContent = async (filePath, fileType) => {
 };
 
 const synthesizeSpeech = async (text) => {
-  const speechConfig = sdk.SpeechConfig.fromSubscription(
-    process.env.AZURE_SPEECH_KEY,
-    process.env.AZURE_SPEECH_REGION
-  );
-  const audioFileName = `${Date.now()}-response.wav`;
-  const audioFilePath = path.join(__dirname, "../uploads", audioFileName);
-  const audioConfig = sdk.AudioConfig.fromAudioFileOutput(audioFilePath);
-  const synthesizer = new sdk.SpeechSynthesizer(speechConfig, audioConfig);
-
-  return new Promise((resolve, reject) => {
-    synthesizer.speakTextAsync(
-      text,
-      (result) => {
-        if (result.reason === sdk.ResultReason.SynthesizingAudioCompleted) {
-          console.log("Synthesis finished.");
-          resolve(audioFileName);
-        } else {
-          console.error("Speech synthesis canceled, " + result.errorDetails);
-          reject(result.errorDetails);
-        }
-        synthesizer.close();
-      },
-      (error) => {
-        console.error("Error synthesizing speech: ", error);
-        synthesizer.close();
-        reject(error);
-      }
-    );
-  });
+  try {
+    const audioFileName = await createAudioFileFromText(text);
+    const audioFilePath = path.join(__dirname, "../uploads", audioFileName);
+    fs.renameSync(audioFileName, audioFilePath); // Move file to uploads directory
+    return audioFileName;
+  } catch (error) {
+    console.error("Error synthesizing speech with Eleven Labs: ", error);
+    throw error;
+  }
 };
 
 router.post("/", verifyToken, async (req, res) => {
@@ -127,7 +107,7 @@ router.post("/", verifyToken, async (req, res) => {
   try {
     const userFiles = await File.findFilesByUserId(userId);
     const user = await User.findOneById(userId);
-    const username = user.username; 
+    const username = user.username;
     console.log("User found:", user);
 
     let context = `Here is the personal information of ${username}:\n\n`;
