@@ -49,6 +49,11 @@ async function connectToCosmosDB() {
 
 connectToCosmosDB();
 
+// Ping route for warming up the backend
+app.get("/ping", (req, res) => {
+  res.status(200).send("Pong! Backend is alive.");
+});
+
 // Routes
 const authRoutes = require("./routes/auth");
 const uploadRoutes = require("./routes/upload");
