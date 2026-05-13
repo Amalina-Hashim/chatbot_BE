@@ -9,6 +9,8 @@ const File = require("../models/File");
 const User = require("../models/User");
 const extractKeyInfo = require("../utils/extractKeyInfo");
 const { createAudioFileFromText } = require("./textToSpeech");
+const resumeContent = require("../my-website/src/components/Resume");
+const portfolioContent = require("../my-website/src/db");
 
 const router = express.Router();
 
@@ -46,59 +48,6 @@ const splitIntoSnippets = (text) =>
     .map((part) => part.trim())
     .filter((part) => part.length >= 35)
     .map((part) => (part.length > 220 ? `${part.slice(0, 217)}...` : part));
-
-const buildFallbackResponse = (context, message, username) => {
-  const normalizedMessage = (message || "").toLowerCase();
-  const keywords = normalizedMessage
-    .split(/\W+/)
-    .filter(
-      (word) =>
-        word.length >= 4 &&
-        !["what", "about", "with", "from", "your"].includes(word),
-    )
-    .slice(0, 6);
-
-  const contextLines = splitIntoSnippets(context);
-
-  const scoredMatches = [];
-  for (const line of contextLines) {
-    const normalizedLine = line.toLowerCase();
-    const keywordHits = keywords.filter((keyword) =>
-      normalizedLine.includes(keyword),
-    ).length;
-
-    if (keywordHits > 0) {
-      scoredMatches.push({ line, score: keywordHits });
-    }
-  }
-
-  const selectedLines = scoredMatches.length
-    ? scoredMatches
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 3)
-        .map((entry) => entry.line)
-    : contextLines.slice(0, 3);
-
-  const fallbackText = selectedLines.length
-    ? `I am currently under heavy load, but I can still help with a quick summary about ${username}:\n\n- ${selectedLines.join("\n- ")}\n\nAsk me a narrower follow-up question and I can refine this further.`
-    : `I am currently under heavy load and could not fetch the full AI response. Please try again in a few moments.`;
-
-  return {
-    id: "fallback-response",
-    object: "chat.completion",
-    choices: [
-      {
-        index: 0,
-        finish_reason: "stop",
-        message: {
-          role: "assistant",
-          content: fallbackText,
-        },
-      },
-    ],
-    fallback: true,
-  };
-};
 
 const openAIRequest = async (context, message, username) => {
   for (let attempt = 0; attempt <= MAX_OPENAI_RETRIES; attempt++) {
@@ -202,6 +151,47 @@ const synthesizeSpeech = async (text) => {
   }
 };
 
+const getResumeContext = () => {
+  let context = "Resume:\n\n";
+
+  context += "Core Competencies:\n";
+  context += resumeContent.coreCompetencies.join("\n") + "\n\n";
+
+  context += "Technical Skills:\n";
+  context += resumeContent.technicalSkills.join("\n") + "\n\n";
+
+  context += "Key Achievements:\n";
+  resumeContent.keyAchievements.forEach((achievement, index) => {
+    context += `${index + 1}. ${achievement}\n`;
+  });
+
+  context += "\nProfessional Experience:\n";
+  resumeContent.professionalExperience.forEach((experience) => {
+    context += `Role: ${experience.role}\nCompany: ${experience.company}\nPeriod: ${experience.period}\n`;
+    experience.points.forEach((point) => {
+      context += `- ${point}\n`;
+    });
+    context += "\n";
+  });
+
+  return context;
+};
+
+const getPortfolioContext = () => {
+  let context = "Portfolio:\n\n";
+
+  portfolioContent.portfolio.forEach((project) => {
+    context += `Title: ${project.title}\n`;
+    context += project.descriptions.join("\n") + "\n\n";
+    project.listItems.forEach((item) => {
+      context += `- ${item}\n`;
+    });
+    context += "\n";
+  });
+
+  return context;
+};
+
 router.post("/", verifyToken, async (req, res) => {
   console.log("POST /chat endpoint hit");
   const { message } = req.body;
@@ -217,48 +207,57 @@ router.post("/", verifyToken, async (req, res) => {
 
     let context = `Here is the personal information of ${username}:\n\n`;
 
-    const candidateFiles = userFiles
-      .filter((file) => SUPPORTED_CONTEXT_FILE_TYPES.has(file.fileType))
-      .sort((a, b) => (b._ts || 0) - (a._ts || 0));
+    if (message.toLowerCase().includes("resume")) {
+      context += getResumeContext();
+    } else if (message.toLowerCase().includes("portfolio")) {
+      context += getPortfolioContext();
+    } else {
+      const candidateFiles = userFiles
+        .filter((file) => SUPPORTED_CONTEXT_FILE_TYPES.has(file.fileType))
+        .sort((a, b) => (b._ts || 0) - (a._ts || 0));
 
-    const contextSourceFile = candidateFiles[0];
+      const contextSourceFile = candidateFiles[0];
 
-    if (!contextSourceFile) {
-      console.log("No supported context file found for user");
-    }
-
-    for (const file of contextSourceFile ? [contextSourceFile] : []) {
-      const filePath = path.join(__dirname, "../", file.filePath);
-      console.log(`Processing file: ${filePath}`);
-      if (!fs.existsSync(filePath)) {
-        console.log(`File not found: ${filePath}, skipping`);
-        continue;
+      if (!contextSourceFile) {
+        console.log("No supported context file found for user");
       }
-      try {
-        const hasValidCache =
-          typeof file.cachedContext === "string" &&
-          file.cachedContext.trim() &&
-          file.cachedFromPath === file.filePath;
 
-        let summarizedFileContext = file.cachedContext || "";
+      for (const file of contextSourceFile ? [contextSourceFile] : []) {
+        const filePath = path.join(__dirname, "../", file.filePath);
+        console.log(`Processing file: ${filePath}`);
+        if (!fs.existsSync(filePath)) {
+          console.log(`File not found: ${filePath}, skipping`);
+          continue;
+        }
+        try {
+          const hasValidCache =
+            typeof file.cachedContext === "string" &&
+            file.cachedContext.trim() &&
+            file.cachedFromPath === file.filePath;
 
-        if (!hasValidCache) {
-          const fileContent = await readFileContent(filePath, file.fileType);
-          summarizedFileContext = extractKeyInfo(
-            fileContent,
-            MAX_CONTEXT_LENGTH,
-          );
-          await File.updateCachedContext(
-            file.id,
-            userId,
-            summarizedFileContext,
-            file.filePath,
+          let summarizedFileContext = file.cachedContext || "";
+
+          if (!hasValidCache) {
+            const fileContent = await readFileContent(filePath, file.fileType);
+            summarizedFileContext = extractKeyInfo(
+              fileContent,
+              MAX_CONTEXT_LENGTH,
+            );
+            await File.updateCachedContext(
+              file.id,
+              userId,
+              summarizedFileContext,
+              file.filePath,
+            );
+          }
+
+          context += summarizedFileContext + "\n\n";
+        } catch (fileError) {
+          console.error(
+            `Error processing file ${filePath}:`,
+            fileError.message,
           );
         }
-
-        context += summarizedFileContext + "\n\n";
-      } catch (fileError) {
-        console.error(`Error processing file ${filePath}:`, fileError.message);
       }
     }
 
@@ -298,14 +297,7 @@ router.post("/", verifyToken, async (req, res) => {
     });
   } catch (error) {
     console.error("Error processing chat:", error);
-    if (error?.response?.status === 429) {
-      return res.status(503).json({
-        message:
-          "Chat service is temporarily busy. Please try again in a few seconds.",
-      });
-    }
-
-    res.status(500).send("Error processing chat");
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
