@@ -16,8 +16,8 @@ const MAX_CONTEXT_LENGTH = 2000;
 const MAX_OPENAI_RETRIES = 3;
 const BASE_RETRY_DELAY_MS = 1000;
 const OPENAI_REQUEST_TIMEOUT_MS = 12000;
-const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
-const OPENAI_MAX_TOKENS = Number(process.env.OPENAI_MAX_TOKENS || 220);
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o";
+const OPENAI_MAX_TOKENS = Number(process.env.OPENAI_MAX_TOKENS || 260);
 
 const SUPPORTED_CONTEXT_FILE_TYPES = new Set([
   "application/pdf",
@@ -51,7 +51,11 @@ const buildFallbackResponse = (context, message, username) => {
   const normalizedMessage = (message || "").toLowerCase();
   const keywords = normalizedMessage
     .split(/\W+/)
-    .filter((word) => word.length >= 4 && !["what", "about", "with", "from", "your"].includes(word))
+    .filter(
+      (word) =>
+        word.length >= 4 &&
+        !["what", "about", "with", "from", "your"].includes(word),
+    )
     .slice(0, 6);
 
   const contextLines = splitIntoSnippets(context);
@@ -104,11 +108,19 @@ const openAIRequest = async (context, message, username) => {
         {
           model: OPENAI_MODEL,
           max_tokens: OPENAI_MAX_TOKENS,
-          temperature: 0.4,
+          temperature: 0.2,
           messages: [
             {
               role: "system",
-              content: `You are ${username}. The following is your information about yourself:\n\n${context}`,
+              content: `You are ${username}. Use only the profile information below to answer.
+
+Rules:
+- Be concise and factual.
+- If information is not present in the profile context, say you do not have that information.
+- Do not invent achievements, companies, dates, or certifications.
+- Prefer bullet points for summaries.
+
+Profile context:\n\n${context}`,
             },
             { role: "user", content: message },
           ],
