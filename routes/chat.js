@@ -34,16 +34,8 @@ const SUPPORTED_CONTEXT_FILE_TYPES = new Set([
   "text/plain",
 ]);
 
-const normalizeFallbackText = (text) =>
-  (text || "")
-    .replace(/[\t\r]+/g, " ")
-    .replace(/\s{2,}/g, " ")
-    .replace(/[^\x20-\x7E\n]/g, " ")
-    .replace(/\n{2,}/g, "\n")
-    .trim();
-
 const splitIntoSnippets = (text) =>
-  normalizeFallbackText(text)
+  (text || "")
     .split(/\n|(?<=[.!?])\s+/)
     .map((part) => part.trim())
     .filter((part) => part.length >= 35)
@@ -266,17 +258,8 @@ router.post("/", verifyToken, async (req, res) => {
         context.slice(0, MAX_CONTEXT_LENGTH) + "... [content truncated]";
     }
 
-    let responseData;
-    try {
-      responseData = await openAIRequest(context, message, username);
-      console.log("OpenAI response:", responseData);
-    } catch (openAIError) {
-      console.error(
-        "OpenAI unavailable, using fallback response:",
-        openAIError.message,
-      );
-      responseData = buildFallbackResponse(context, message, username);
-    }
+    const responseData = await openAIRequest(context, message, username);
+    console.log("OpenAI response:", responseData);
 
     let audioFileName = "";
     try {
