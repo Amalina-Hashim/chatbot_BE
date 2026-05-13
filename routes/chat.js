@@ -16,6 +16,8 @@ const MAX_CONTEXT_LENGTH = 2000;
 const MAX_OPENAI_RETRIES = 3;
 const BASE_RETRY_DELAY_MS = 1000;
 const OPENAI_REQUEST_TIMEOUT_MS = 12000;
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+const OPENAI_MAX_TOKENS = Number(process.env.OPENAI_MAX_TOKENS || 220);
 
 const openAIRequest = async (context, message, username) => {
   for (let attempt = 0; attempt <= MAX_OPENAI_RETRIES; attempt++) {
@@ -23,7 +25,9 @@ const openAIRequest = async (context, message, username) => {
       const response = await axios.post(
         "https://api.openai.com/v1/chat/completions",
         {
-          model: "gpt-4-turbo",
+          model: OPENAI_MODEL,
+          max_tokens: OPENAI_MAX_TOKENS,
+          temperature: 0.4,
           messages: [
             {
               role: "system",
