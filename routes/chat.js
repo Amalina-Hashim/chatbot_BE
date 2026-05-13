@@ -19,6 +19,54 @@ const OPENAI_REQUEST_TIMEOUT_MS = 12000;
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const OPENAI_MAX_TOKENS = Number(process.env.OPENAI_MAX_TOKENS || 220);
 
+const buildFallbackResponse = (context, message, username) => {
+  const normalizedMessage = (message || "").toLowerCase();
+  const keywords = normalizedMessage
+    .split(/\W+/)
+    .filter((word) => word.length >= 4)
+    .slice(0, 6);
+
+  const contextLines = (context || "")
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const matchedLines = [];
+  for (const line of contextLines) {
+    const normalizedLine = line.toLowerCase();
+    if (keywords.some((keyword) => normalizedLine.includes(keyword))) {
+      matchedLines.push(line);
+    }
+    if (matchedLines.length >= 3) {
+      break;
+    }
+  }
+
+  const selectedLines = matchedLines.length
+    ? matchedLines
+    : contextLines.slice(0, 3);
+
+  const fallbackText = selectedLines.length
+    ? `I am currently under heavy load, but here is relevant information about ${username}:\n\n${selectedLines.join("\n")}`
+    : "I am currently under heavy load. Please try your question again in a few moments.";
+
+  return {
+    id: "fallback-response",
+    object: "chat.completion",
+    choices: [
+      {
+        index: 0,
+        finish_reason: "stop",
+        message: {
+          role: "assistant",
+          content: fallbackText,
+        },
+      },
+    ],
+    fallback: true,
+  };
+};
+
 const openAIRequest = async (context, message, username) => {
   for (let attempt = 0; attempt <= MAX_OPENAI_RETRIES; attempt++) {
     try {
@@ -135,25 +183,29 @@ router.post("/", verifyToken, async (req, res) => {
         console.log(`File not found: ${filePath}, skipping`);
         continue;
       }
-      const hasValidCache =
-        typeof file.cachedContext === "string" &&
-        file.cachedContext.trim() &&
-        file.cachedFromPath === file.filePath;
+      try {
+        const hasValidCache =
+          typeof file.cachedContext === "string" &&
+          file.cachedContext.trim() &&
+          file.cachedFromPath === file.filePath;
 
-      let summarizedFileContext = file.cachedContext || "";
+        let summarizedFileContext = file.cachedContext || "";
 
-      if (!hasValidCache) {
-        const fileContent = await readFileContent(filePath, file.fileType);
-        summarizedFileContext = extractKeyInfo(fileContent, MAX_CONTEXT_LENGTH);
-        await File.updateCachedContext(
-          file.id,
-          userId,
-          summarizedFileContext,
-          file.filePath,
-        );
+        if (!hasValidCache) {
+          const fileContent = await readFileContent(filePath, file.fileType);
+          summarizedFileContext = extractKeyInfo(fileContent, MAX_CONTEXT_LENGTH);
+          await File.updateCachedContext(
+            file.id,
+            userId,
+            summarizedFileContext,
+            file.filePath,
+          );
+        }
+
+        context += summarizedFileContext + "\n\n";
+      } catch (fileError) {
+        console.error(`Error processing file ${filePath}:`, fileError.message);
       }
-
-      context += summarizedFileContext + "\n\n";
     }
 
     if (context.length > MAX_CONTEXT_LENGTH) {
@@ -161,17 +213,26 @@ router.post("/", verifyToken, async (req, res) => {
         context.slice(0, MAX_CONTEXT_LENGTH) + "... [content truncated]";
     }
 
-    const responseData = await openAIRequest(context, message, username);
-    console.log("OpenAI response:", responseData);
+    let responseData;
+    try {
+      responseData = await openAIRequest(context, message, username);
+      console.log("OpenAI response:", responseData);
+    } catch (openAIError) {
+      console.error("OpenAI unavailable, using fallback response:", openAIError.message);
+      responseData = buildFallbackResponse(context, message, username);
+    }
 
-    const audioFileName = await synthesizeSpeech(
-      responseData.choices[0].message.content,
-    );
-    console.log("Audio file generated:", audioFileName);
+    let audioFileName = "";
+    try {
+      audioFileName = await synthesizeSpeech(responseData.choices[0].message.content);
+      console.log("Audio file generated:", audioFileName);
+    } catch (ttsError) {
+      console.error("Audio generation unavailable, returning text-only response:", ttsError.message);
+    }
 
     res.json({
       ...responseData,
-      audioPath: `/uploads/${audioFileName}`,
+      audioPath: audioFileName ? `/uploads/${audioFileName}` : "",
     });
   } catch (error) {
     console.error("Error processing chat:", error);
