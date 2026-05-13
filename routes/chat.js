@@ -19,6 +19,19 @@ const OPENAI_REQUEST_TIMEOUT_MS = 12000;
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const OPENAI_MAX_TOKENS = Number(process.env.OPENAI_MAX_TOKENS || 220);
 
+const SUPPORTED_CONTEXT_FILE_TYPES = new Set([
+  "application/pdf",
+  "application-pdf",
+  "pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/msword",
+  "application/word",
+  "application/vnd.ms-word.document.macroEnabled.12",
+  "application/vnd.ms-word.template.macroEnabled.12",
+  "application-vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain",
+]);
+
 const buildFallbackResponse = (context, message, username) => {
   const normalizedMessage = (message || "").toLowerCase();
   const keywords = normalizedMessage
@@ -176,7 +189,17 @@ router.post("/", verifyToken, async (req, res) => {
 
     let context = `Here is the personal information of ${username}:\n\n`;
 
-    for (const file of userFiles) {
+    const candidateFiles = userFiles
+      .filter((file) => SUPPORTED_CONTEXT_FILE_TYPES.has(file.fileType))
+      .sort((a, b) => (b._ts || 0) - (a._ts || 0));
+
+    const contextSourceFile = candidateFiles[0];
+
+    if (!contextSourceFile) {
+      console.log("No supported context file found for user");
+    }
+
+    for (const file of contextSourceFile ? [contextSourceFile] : []) {
       const filePath = path.join(__dirname, "../", file.filePath);
       console.log(`Processing file: ${filePath}`);
       if (!fs.existsSync(filePath)) {
@@ -193,7 +216,10 @@ router.post("/", verifyToken, async (req, res) => {
 
         if (!hasValidCache) {
           const fileContent = await readFileContent(filePath, file.fileType);
-          summarizedFileContext = extractKeyInfo(fileContent, MAX_CONTEXT_LENGTH);
+          summarizedFileContext = extractKeyInfo(
+            fileContent,
+            MAX_CONTEXT_LENGTH,
+          );
           await File.updateCachedContext(
             file.id,
             userId,
@@ -218,16 +244,24 @@ router.post("/", verifyToken, async (req, res) => {
       responseData = await openAIRequest(context, message, username);
       console.log("OpenAI response:", responseData);
     } catch (openAIError) {
-      console.error("OpenAI unavailable, using fallback response:", openAIError.message);
+      console.error(
+        "OpenAI unavailable, using fallback response:",
+        openAIError.message,
+      );
       responseData = buildFallbackResponse(context, message, username);
     }
 
     let audioFileName = "";
     try {
-      audioFileName = await synthesizeSpeech(responseData.choices[0].message.content);
+      audioFileName = await synthesizeSpeech(
+        responseData.choices[0].message.content,
+      );
       console.log("Audio file generated:", audioFileName);
     } catch (ttsError) {
-      console.error("Audio generation unavailable, returning text-only response:", ttsError.message);
+      console.error(
+        "Audio generation unavailable, returning text-only response:",
+        ttsError.message,
+      );
     }
 
     res.json({
