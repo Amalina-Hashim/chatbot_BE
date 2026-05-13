@@ -32,36 +32,52 @@ const SUPPORTED_CONTEXT_FILE_TYPES = new Set([
   "text/plain",
 ]);
 
+const normalizeFallbackText = (text) =>
+  (text || "")
+    .replace(/[\t\r]+/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .replace(/[^\x20-\x7E\n]/g, " ")
+    .replace(/\n{2,}/g, "\n")
+    .trim();
+
+const splitIntoSnippets = (text) =>
+  normalizeFallbackText(text)
+    .split(/\n|(?<=[.!?])\s+/)
+    .map((part) => part.trim())
+    .filter((part) => part.length >= 35)
+    .map((part) => (part.length > 220 ? `${part.slice(0, 217)}...` : part));
+
 const buildFallbackResponse = (context, message, username) => {
   const normalizedMessage = (message || "").toLowerCase();
   const keywords = normalizedMessage
     .split(/\W+/)
-    .filter((word) => word.length >= 4)
+    .filter((word) => word.length >= 4 && !["what", "about", "with", "from", "your"].includes(word))
     .slice(0, 6);
 
-  const contextLines = (context || "")
-    .split(/\n+/)
-    .map((line) => line.trim())
-    .filter(Boolean);
+  const contextLines = splitIntoSnippets(context);
 
-  const matchedLines = [];
+  const scoredMatches = [];
   for (const line of contextLines) {
     const normalizedLine = line.toLowerCase();
-    if (keywords.some((keyword) => normalizedLine.includes(keyword))) {
-      matchedLines.push(line);
-    }
-    if (matchedLines.length >= 3) {
-      break;
+    const keywordHits = keywords.filter((keyword) =>
+      normalizedLine.includes(keyword),
+    ).length;
+
+    if (keywordHits > 0) {
+      scoredMatches.push({ line, score: keywordHits });
     }
   }
 
-  const selectedLines = matchedLines.length
-    ? matchedLines
+  const selectedLines = scoredMatches.length
+    ? scoredMatches
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 3)
+        .map((entry) => entry.line)
     : contextLines.slice(0, 3);
 
   const fallbackText = selectedLines.length
-    ? `I am currently under heavy load, but here is relevant information about ${username}:\n\n${selectedLines.join("\n")}`
-    : "I am currently under heavy load. Please try your question again in a few moments.";
+    ? `I am currently under heavy load, but I can still help with a quick summary about ${username}:\n\n- ${selectedLines.join("\n- ")}\n\nAsk me a narrower follow-up question and I can refine this further.`
+    : `I am currently under heavy load and could not fetch the full AI response. Please try again in a few moments.`;
 
   return {
     id: "fallback-response",
