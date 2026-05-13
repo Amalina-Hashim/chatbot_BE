@@ -9,8 +9,6 @@ const File = require("../models/File");
 const User = require("../models/User");
 const extractKeyInfo = require("../utils/extractKeyInfo");
 const { createAudioFileFromText } = require("./textToSpeech");
-const resumeContent = require("../my-website/src/components/Resume");
-const portfolioContent = require("../my-website/src/db");
 
 const router = express.Router();
 
@@ -33,13 +31,6 @@ const SUPPORTED_CONTEXT_FILE_TYPES = new Set([
   "application-vnd.openxmlformats-officedocument.wordprocessingml.document",
   "text/plain",
 ]);
-
-const splitIntoSnippets = (text) =>
-  (text || "")
-    .split(/\n|(?<=[.!?])\s+/)
-    .map((part) => part.trim())
-    .filter((part) => part.length >= 35)
-    .map((part) => (part.length > 220 ? `${part.slice(0, 217)}...` : part));
 
 const openAIRequest = async (context, message, username) => {
   for (let attempt = 0; attempt <= MAX_OPENAI_RETRIES; attempt++) {
@@ -143,47 +134,6 @@ const synthesizeSpeech = async (text) => {
   }
 };
 
-const getResumeContext = () => {
-  let context = "Resume:\n\n";
-
-  context += "Core Competencies:\n";
-  context += resumeContent.coreCompetencies.join("\n") + "\n\n";
-
-  context += "Technical Skills:\n";
-  context += resumeContent.technicalSkills.join("\n") + "\n\n";
-
-  context += "Key Achievements:\n";
-  resumeContent.keyAchievements.forEach((achievement, index) => {
-    context += `${index + 1}. ${achievement}\n`;
-  });
-
-  context += "\nProfessional Experience:\n";
-  resumeContent.professionalExperience.forEach((experience) => {
-    context += `Role: ${experience.role}\nCompany: ${experience.company}\nPeriod: ${experience.period}\n`;
-    experience.points.forEach((point) => {
-      context += `- ${point}\n`;
-    });
-    context += "\n";
-  });
-
-  return context;
-};
-
-const getPortfolioContext = () => {
-  let context = "Portfolio:\n\n";
-
-  portfolioContent.portfolio.forEach((project) => {
-    context += `Title: ${project.title}\n`;
-    context += project.descriptions.join("\n") + "\n\n";
-    project.listItems.forEach((item) => {
-      context += `- ${item}\n`;
-    });
-    context += "\n";
-  });
-
-  return context;
-};
-
 router.post("/", verifyToken, async (req, res) => {
   console.log("POST /chat endpoint hit");
   const { message } = req.body;
@@ -199,57 +149,48 @@ router.post("/", verifyToken, async (req, res) => {
 
     let context = `Here is the personal information of ${username}:\n\n`;
 
-    if (message.toLowerCase().includes("resume")) {
-      context += getResumeContext();
-    } else if (message.toLowerCase().includes("portfolio")) {
-      context += getPortfolioContext();
-    } else {
-      const candidateFiles = userFiles
-        .filter((file) => SUPPORTED_CONTEXT_FILE_TYPES.has(file.fileType))
-        .sort((a, b) => (b._ts || 0) - (a._ts || 0));
+    const candidateFiles = userFiles
+      .filter((file) => SUPPORTED_CONTEXT_FILE_TYPES.has(file.fileType))
+      .sort((a, b) => (b._ts || 0) - (a._ts || 0));
 
-      const contextSourceFile = candidateFiles[0];
+    const contextSourceFile = candidateFiles[0];
 
-      if (!contextSourceFile) {
-        console.log("No supported context file found for user");
+    if (!contextSourceFile) {
+      console.log("No supported context file found for user");
+    }
+
+    for (const file of contextSourceFile ? [contextSourceFile] : []) {
+      const filePath = path.join(__dirname, "../", file.filePath);
+      console.log(`Processing file: ${filePath}`);
+      if (!fs.existsSync(filePath)) {
+        console.log(`File not found: ${filePath}, skipping`);
+        continue;
       }
+      try {
+        const hasValidCache =
+          typeof file.cachedContext === "string" &&
+          file.cachedContext.trim() &&
+          file.cachedFromPath === file.filePath;
 
-      for (const file of contextSourceFile ? [contextSourceFile] : []) {
-        const filePath = path.join(__dirname, "../", file.filePath);
-        console.log(`Processing file: ${filePath}`);
-        if (!fs.existsSync(filePath)) {
-          console.log(`File not found: ${filePath}, skipping`);
-          continue;
-        }
-        try {
-          const hasValidCache =
-            typeof file.cachedContext === "string" &&
-            file.cachedContext.trim() &&
-            file.cachedFromPath === file.filePath;
+        let summarizedFileContext = file.cachedContext || "";
 
-          let summarizedFileContext = file.cachedContext || "";
-
-          if (!hasValidCache) {
-            const fileContent = await readFileContent(filePath, file.fileType);
-            summarizedFileContext = extractKeyInfo(
-              fileContent,
-              MAX_CONTEXT_LENGTH,
-            );
-            await File.updateCachedContext(
-              file.id,
-              userId,
-              summarizedFileContext,
-              file.filePath,
-            );
-          }
-
-          context += summarizedFileContext + "\n\n";
-        } catch (fileError) {
-          console.error(
-            `Error processing file ${filePath}:`,
-            fileError.message,
+        if (!hasValidCache) {
+          const fileContent = await readFileContent(filePath, file.fileType);
+          summarizedFileContext = extractKeyInfo(
+            fileContent,
+            MAX_CONTEXT_LENGTH,
+          );
+          await File.updateCachedContext(
+            file.id,
+            userId,
+            summarizedFileContext,
+            file.filePath,
           );
         }
+
+        context += summarizedFileContext + "\n\n";
+      } catch (fileError) {
+        console.error(`Error processing file ${filePath}:`, fileError.message);
       }
     }
 
