@@ -1,5 +1,5 @@
 const express = require("express");
-const axios = require("axios"); 
+const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
 const pdfParse = require("pdf-parse");
@@ -13,37 +13,49 @@ const { createAudioFileFromText } = require("./textToSpeech");
 const router = express.Router();
 
 const MAX_CONTEXT_LENGTH = 2000;
+const MAX_OPENAI_RETRIES = 3;
+const BASE_RETRY_DELAY_MS = 1000;
+const OPENAI_REQUEST_TIMEOUT_MS = 12000;
 
 const openAIRequest = async (context, message, username) => {
-  try {
-    const response = await axios.post(
-      "https://api.openai.com/v1/chat/completions",
-      {
-        model: "gpt-4-turbo",
-        messages: [
-          {
-            role: "system",
-            content: `You are ${username}. The following is your information about yourself:\n\n${context}`,
-          },
-          { role: "user", content: message },
-        ],
-      },
-      {
-        headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+  for (let attempt = 0; attempt <= MAX_OPENAI_RETRIES; attempt++) {
+    try {
+      const response = await axios.post(
+        "https://api.openai.com/v1/chat/completions",
+        {
+          model: "gpt-4-turbo",
+          messages: [
+            {
+              role: "system",
+              content: `You are ${username}. The following is your information about yourself:\n\n${context}`,
+            },
+            { role: "user", content: message },
+          ],
+        },
+        {
+          timeout: OPENAI_REQUEST_TIMEOUT_MS,
+          headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+        },
+      );
+      return response.data;
+    } catch (error) {
+      const statusCode = error?.response?.status;
+      const isRateLimited = statusCode === 429;
+
+      if (!isRateLimited || attempt === MAX_OPENAI_RETRIES) {
+        console.error("Error in openAIRequest:", error.message);
+        throw error;
       }
-    );
-    return response.data;
-  } catch (error) {
-    if (error.response && error.response.status === 429) {
-      const retryAfter = error.response.headers["retry-after"]
-        ? parseInt(error.response.headers["retry-after"]) * 1000
-        : 1000;
-      console.error(`Rate limited. Retrying after ${retryAfter}ms`);
-      await new Promise((resolve) => setTimeout(resolve, retryAfter));
-      return openAIRequest(context, message, username);
-    } else {
-      console.error("Error in openAIRequest:", error.message);
-      throw error;
+
+      const retryAfterHeader = error.response.headers["retry-after"];
+      const retryAfterMs = retryAfterHeader
+        ? parseInt(retryAfterHeader, 10) * 1000
+        : 0;
+      const backoffMs = BASE_RETRY_DELAY_MS * 2 ** attempt;
+      const delayMs = Math.max(retryAfterMs, backoffMs);
+
+      console.error(`Rate limited. Retrying after ${delayMs}ms`);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
   }
 };
@@ -119,8 +131,25 @@ router.post("/", verifyToken, async (req, res) => {
         console.log(`File not found: ${filePath}, skipping`);
         continue;
       }
-      const fileContent = await readFileContent(filePath, file.fileType);
-      context += extractKeyInfo(fileContent, MAX_CONTEXT_LENGTH) + "\n\n";
+      const hasValidCache =
+        typeof file.cachedContext === "string" &&
+        file.cachedContext.trim() &&
+        file.cachedFromPath === file.filePath;
+
+      let summarizedFileContext = file.cachedContext || "";
+
+      if (!hasValidCache) {
+        const fileContent = await readFileContent(filePath, file.fileType);
+        summarizedFileContext = extractKeyInfo(fileContent, MAX_CONTEXT_LENGTH);
+        await File.updateCachedContext(
+          file.id,
+          userId,
+          summarizedFileContext,
+          file.filePath,
+        );
+      }
+
+      context += summarizedFileContext + "\n\n";
     }
 
     if (context.length > MAX_CONTEXT_LENGTH) {
@@ -132,7 +161,7 @@ router.post("/", verifyToken, async (req, res) => {
     console.log("OpenAI response:", responseData);
 
     const audioFileName = await synthesizeSpeech(
-      responseData.choices[0].message.content
+      responseData.choices[0].message.content,
     );
     console.log("Audio file generated:", audioFileName);
 
@@ -142,6 +171,13 @@ router.post("/", verifyToken, async (req, res) => {
     });
   } catch (error) {
     console.error("Error processing chat:", error);
+    if (error?.response?.status === 429) {
+      return res.status(503).json({
+        message:
+          "Chat service is temporarily busy. Please try again in a few seconds.",
+      });
+    }
+
     res.status(500).send("Error processing chat");
   }
 });

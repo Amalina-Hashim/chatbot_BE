@@ -36,6 +36,44 @@ class File {
     const { resources } = await container.items.query(querySpec).fetchAll();
     return resources;
   }
+
+  static async updateCachedContext(
+    fileId,
+    userId,
+    cachedContext,
+    cachedFromPath,
+  ) {
+    const querySpec = {
+      query: "SELECT * from c WHERE c.id=@fileId AND c.userId=@userId",
+      parameters: [
+        {
+          name: "@fileId",
+          value: fileId,
+        },
+        {
+          name: "@userId",
+          value: userId,
+        },
+      ],
+    };
+
+    const { resources } = await container.items.query(querySpec).fetchAll();
+    const existing = resources[0];
+
+    if (!existing) {
+      return null;
+    }
+
+    const updatedDoc = {
+      ...existing,
+      cachedContext,
+      cachedFromPath,
+      cachedAt: Date.now(),
+    };
+
+    const { resource } = await container.items.upsert(updatedDoc);
+    return resource;
+  }
 }
 
 module.exports = File;
