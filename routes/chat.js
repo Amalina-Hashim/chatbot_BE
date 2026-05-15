@@ -9,10 +9,11 @@ const File = require("../models/File");
 const User = require("../models/User");
 const extractKeyInfo = require("../utils/extractKeyInfo");
 const { createAudioFileFromText } = require("./textToSpeech");
+const SITE_KNOWLEDGE_BASE = require("../data/siteKnowledgeBase");
 
 const router = express.Router();
 
-const MAX_CONTEXT_LENGTH = 2000;
+const MAX_CONTEXT_LENGTH = 6000;
 const MAX_OPENAI_RETRIES = 3;
 const BASE_RETRY_DELAY_MS = 1000;
 const OPENAI_REQUEST_TIMEOUT_MS = 12000;
@@ -50,7 +51,10 @@ Rules:
 - Be concise and factual.
 - If information is not present in the profile context, say you do not have that information.
 - Do not invent achievements, companies, dates, or certifications.
-- Prefer bullet points for summaries.
+- Respond in first person as ${username}.
+- Default to short natural paragraphs for direct questions.
+- Use bullet points only when the user explicitly asks for a list, summary, or comparison.
+- If asked about technical experience, answer in a conversational style first, then optionally add 1 to 3 supporting points.
 
 Profile context:\n\n${context}`,
             },
@@ -134,6 +138,27 @@ const synthesizeSpeech = async (text) => {
   }
 };
 
+router.post("/greeting", verifyToken, async (req, res) => {
+  const requestedGreeting = req.body?.message;
+  const greetingText =
+    typeof requestedGreeting === "string" && requestedGreeting.trim()
+      ? requestedGreeting.trim()
+      : "Hello, how can I help you?";
+
+  try {
+    const audioFileName = await synthesizeSpeech(greetingText);
+    res.json({
+      text: greetingText,
+      audioPath: audioFileName ? `/uploads/${audioFileName}` : "",
+    });
+  } catch (error) {
+    console.error("Error generating greeting audio:", error);
+    res.status(503).json({
+      error: "Greeting audio is temporarily unavailable. Please try again.",
+    });
+  }
+});
+
 router.post("/", verifyToken, async (req, res) => {
   console.log("POST /chat endpoint hit");
   const { message } = req.body;
@@ -148,6 +173,7 @@ router.post("/", verifyToken, async (req, res) => {
     console.log("User found:", user);
 
     let context = `Here is the personal information of ${username}:\n\n`;
+    context += `Website resume and portfolio knowledge base:\n\n${SITE_KNOWLEDGE_BASE}\n\n`;
 
     const candidateFiles = userFiles
       .filter((file) => SUPPORTED_CONTEXT_FILE_TYPES.has(file.fileType))
