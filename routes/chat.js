@@ -221,6 +221,22 @@ router.post("/", verifyToken, async (req, res) => {
     });
   } catch (error) {
     console.error("Error processing chat:", error);
+    const upstreamStatus = error?.response?.status;
+
+    if (upstreamStatus === 429) {
+      res.status(429).json({
+        error: "The AI service is currently busy. Please try again shortly.",
+      });
+      return;
+    }
+
+    if (upstreamStatus >= 500 && upstreamStatus <= 599) {
+      res.status(503).json({
+        error: "The AI service is temporarily unavailable. Please try again.",
+      });
+      return;
+    }
+
     res.status(500).json({ error: "Internal server error" });
   }
 });
